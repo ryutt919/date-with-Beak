@@ -6,27 +6,38 @@ from torchvision import datasets, transforms, models
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 from torchvision.models import ResNet50_Weights, resnet50
+import numpy as np
+from sklearn.metrics import classification_report, confusion_matrix
+import json
 
 # 경로 설정
-train_dir = './data/train'  # 학습 데이터 경로
-test_dir = './data/test'    # 테스트 데이터 경로
+train_dir = "./data/train"  # 학습 데이터 경로
+test_dir = "./data/test"  # 테스트 데이터 경로
 
 # 데이터 전처리
-transform_train = transforms.Compose([
-    transforms.Resize((224, 224)),  # ResNet의 입력 크기와 일치
-    transforms.RandomHorizontalFlip(),
-    transforms.RandomRotation(20),
-    transforms.ToTensor(),
-    transforms.Normalize(mean=[0.485, 0.456, 0.406],  # ResNet 사전 학습된 모델의 정규화 값
-                         std=[0.229, 0.224, 0.225])
-])
+transform_train = transforms.Compose(
+    [
+        transforms.Resize((224, 224)),  # ResNet의 입력 크기와 일치
+        transforms.RandomHorizontalFlip(),
+        transforms.RandomRotation(20),
+        transforms.ToTensor(),
+        transforms.Normalize(
+            mean=[0.485, 0.456, 0.406],  # ResNet 사전 학습된 모델의 정규화 값
+            std=[0.229, 0.224, 0.225],
+        ),
+    ]
+)
 
-transform_test = transforms.Compose([
-    transforms.Resize((224, 224)),  # ResNet의 입력 크기와 일치
-    transforms.ToTensor(),
-    transforms.Normalize(mean=[0.485, 0.456, 0.406],  # ResNet 사전 학습된 모델의 정규화 값
-                         std=[0.229, 0.224, 0.225])
-])
+transform_test = transforms.Compose(
+    [
+        transforms.Resize((224, 224)),  # ResNet의 입력 크기와 일치
+        transforms.ToTensor(),
+        transforms.Normalize(
+            mean=[0.485, 0.456, 0.406],  # ResNet 사전 학습된 모델의 정규화 값
+            std=[0.229, 0.224, 0.225],
+        ),
+    ]
+)
 
 # 데이터셋 및 데이터로더
 train_dataset = datasets.ImageFolder(root=train_dir, transform=transform_train)
@@ -51,7 +62,7 @@ for param in model.parameters():
 model.fc = nn.Linear(model.fc.in_features, num_classes)
 
 # GPU 설정
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 if torch.cuda.is_available():
     print("CUDA is available. Using GPU for training.")
 else:
@@ -61,11 +72,19 @@ model = model.to(device)
 # 손실 함수
 criterion = nn.CrossEntropyLoss()
 
-def train_and_test(model, train_loader, test_loader, criterion, num_epochs=30, log_file='training_log.txt'):
+
+def train_and_test(
+    model,
+    train_loader,
+    test_loader,
+    criterion,
+    num_epochs=30,
+    log_file="training_log.txt",
+):
     best_test_acc = 0.0  # 최고 테스트 정확도 추적
 
     # 로그 파일 초기화 및 헤더 작성
-    with open(log_file, mode='w') as file:
+    with open(log_file, mode="w") as file:
         file.write("Epoch\tTrain Loss\tTrain Acc\tTest Loss\tTest Acc\n")
 
     for epoch in range(num_epochs):
@@ -92,7 +111,7 @@ def train_and_test(model, train_loader, test_loader, criterion, num_epochs=30, l
                 param.requires_grad = True
             optimizer = optim.Adam(model.parameters(), lr=1e-5)
             print("두 번째 epoch부터 전체 모델을 미세 조정")
-        
+
         # 학습 단계
         for inputs, labels in tqdm(train_loader, desc="Training"):
             # 데이터를 CUDA 장치로 이동
@@ -136,19 +155,73 @@ def train_and_test(model, train_loader, test_loader, criterion, num_epochs=30, l
         print(f"Test Loss: {epoch_test_loss:.4f} | Test Acc: {epoch_test_acc:.4f}")
 
         # **로그 저장**
-        with open(log_file, mode='a') as file:
-            file.write(f"{epoch+1}\t{epoch_train_loss:.4f}\t{epoch_train_acc:.4f}\t{epoch_test_loss:.4f}\t{epoch_test_acc:.4f}\n")
+        with open(log_file, mode="a") as file:
+            file.write(
+                f"{epoch+1}\t{epoch_train_loss:.4f}\t{epoch_train_acc:.4f}\t{epoch_test_loss:.4f}\t{epoch_test_acc:.4f}\n"
+            )
 
         # **최고 테스트 정확도 모델 저장**
         if epoch_test_acc > best_test_acc:
             best_test_acc = epoch_test_acc
-            torch.save(model.state_dict(), 'best_finetuned_resnet.pth')
+            torch.save(model.state_dict(), "best_finetuned_resnet.pth")
             print("Best model saved.")
 
     print(f"\nTraining complete. Best Test Acc: {best_test_acc:.4f}")
 
+    # 최종 평가 및 메트릭 저장
+    model.eval()
+    all_preds = []
+    all_labels = []
+    all_probs = []
+
+    with torch.no_grad():
+        for inputs, labels in test_loader:
+            inputs = inputs.to(device)
+            labels = labels.to(device)
+            outputs = model(inputs)
+            probs = torch.softmax(outputs, dim=1)
+            _, preds = torch.max(outputs, 1)
+
+            all_preds.extend(preds.cpu().numpy())
+            all_labels.extend(labels.cpu().numpy())
+            all_probs.extend(probs.cpu().numpy())
+
+    all_preds = np.array(all_preds)
+    all_labels = np.array(all_labels)
+    all_probs = np.array(all_probs)
+
+    # Classification Report 저장
+    class_names = train_loader.dataset.classes
+    report = classification_report(
+        all_labels, all_preds, target_names=class_names, output_dict=True
+    )
+
+    with open("resnet_classification_report.json", "w") as f:
+        json.dump(report, f, indent=4)
+
+    print("\nClassification Report saved to resnet_classification_report.json")
+
+    # Confusion Matrix 저장
+    cm = confusion_matrix(all_labels, all_preds)
+    np.save("resnet_confusion_matrix.npy", cm)
+    print("Confusion Matrix saved to resnet_confusion_matrix.npy")
+
+    # 예측 확률 저장 (ROC curve 분석용)
+    np.save("resnet_test_predictions.npy", all_preds)
+    np.save("resnet_test_labels.npy", all_labels)
+    np.save("resnet_test_probs.npy", all_probs)
+    print("Test predictions and probabilities saved.")
+
     return model
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     # 모델 학습 및 테스트 수행
-    model = train_and_test(model, train_loader, test_loader, criterion, num_epochs=30, log_file='resnet_training_log.txt')
+    model = train_and_test(
+        model,
+        train_loader,
+        test_loader,
+        criterion,
+        num_epochs=30,
+        log_file="resnet_training_log.txt",
+    )

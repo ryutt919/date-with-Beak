@@ -1,0 +1,81 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+venv/
+ENV/
+env/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+*.ipynb_checkpoints/
+
+# PyTorch
+*.pth
+*.pt
+*.ckpt
+
+# Data files (대용량 파일은 gitignore)
+data/
+*.zip
+*.tar.gz
+
+# Results
+results/*.png
+results/*.jpg
+results/*.csv
+
+# Logs
+*.log
+log/*.txt
+
+# OS
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# IDE
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Model files (용량이 크므로 제외, Dropbox 링크 사용)
+best_finetuned_resnet.pth
+best_finetuned_vit.pth
+*.pkl
+*.json
+best_randomforest_model.pkl
+xgboost_best_model.json
+
+# Numpy files
+*.npy
+
+# 특정 결과 파일만 포함하고 싶다면 아래 주석 해제
+# !results/sample_result.png
