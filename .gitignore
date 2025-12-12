@@ -20,6 +20,8 @@ wheels/
 .installed.cfg
 *.egg
 
+log/
+
 # Virtual Environment
 venv/
 ENV/
@@ -73,6 +75,8 @@ best_finetuned_vit.pth
 *.json
 best_randomforest_model.pkl
 xgboost_best_model.json
+best_finetuned_efficientnet
+efficientnet_confusion_matrix
 
 # Numpy files
 *.npy
